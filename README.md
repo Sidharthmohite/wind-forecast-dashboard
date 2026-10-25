@@ -1,5 +1,13 @@
 \# Wind Forecast Dashboard
 
+## Live Demo
+
+**Live Dashboard:** https://wind-forecast-dashboard-2.onrender.com
+
+**Backend API:** https://wind-forecast-dashboard-9ha5.onrender.com
+
+**API Documentation:** https://wind-forecast-dashboard-9ha5.onrender.com/docs
+
 
 
 A full-stack web application for comparing wind power generation forecasts with actual wind generation for January 2026.
