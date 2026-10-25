@@ -1,5 +1,4 @@
-
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 
 from fastapi import FastAPI, HTTPException
@@ -12,13 +11,15 @@ from app.elexon_service import (
 
 app = FastAPI(title="UK Wind Forecast Dashboard API")
 
+# CORS configuration for local development and Render deployment
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://wind-forecast-dashboard-2.onrender.com",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -26,15 +27,18 @@ app.add_middleware(
 
 def parse_utc(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+
     if parsed.tzinfo is None:
-        from datetime import timezone
         parsed = parsed.replace(tzinfo=timezone.utc)
+
     return parsed
 
 
 @app.get("/")
 def root():
-    return {"message": "UK Wind Forecast Dashboard API is running"}
+    return {
+        "message": "UK Wind Forecast Dashboard API is running"
+    }
 
 
 @app.get("/health")
@@ -49,12 +53,14 @@ def forecast_summary(
 ):
     try:
         forecasts = fetch_wind_forecasts(start_date, end_date)
+
         return {
             "start_date": start_date,
             "end_date": end_date,
             "records_returned": len(forecasts),
             "forecasts": forecasts,
         }
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -66,6 +72,7 @@ def get_forecasts(
 ):
     try:
         return fetch_wind_forecasts(start_date, end_date)
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -77,6 +84,7 @@ def get_actuals(
 ):
     try:
         return fetch_actual_wind_generation(start_date, end_date)
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -92,20 +100,29 @@ def get_metrics(
 
         hourly_values = {}
 
+        # Group actual generation readings by hour
         for record in actuals:
-            if not record.get("startTime") or record.get("generation") is None:
+            if (
+                not record.get("startTime")
+                or record.get("generation") is None
+            ):
                 continue
 
             timestamp = parse_utc(record["startTime"])
+
             hour_start = timestamp.replace(
-                minute=0, second=0, microsecond=0
+                minute=0,
+                second=0,
+                microsecond=0,
             )
+
             key = hour_start.isoformat()
 
             hourly_values.setdefault(key, []).append(
                 float(record["generation"])
             )
 
+        # Calculate hourly averages
         actual_by_time = {
             key: sum(values) / len(values)
             for key, values in hourly_values.items()
@@ -113,8 +130,12 @@ def get_metrics(
 
         comparisons = []
 
+        # Match forecast records with actual readings
         for record in forecasts:
-            if not record.get("startTime") or record.get("generation") is None:
+            if (
+                not record.get("startTime")
+                or record.get("generation") is None
+            ):
                 continue
 
             timestamp = parse_utc(record["startTime"])
@@ -137,7 +158,9 @@ def get_metrics(
         if not comparisons:
             raise HTTPException(
                 status_code=404,
-                detail="No matching forecast and actual records found.",
+                detail=(
+                    "No matching forecast and actual records found."
+                ),
             )
 
         errors = [
@@ -146,8 +169,13 @@ def get_metrics(
         ]
 
         count = len(errors)
+
         mae = sum(abs(error) for error in errors) / count
-        rmse = math.sqrt(sum(error ** 2 for error in errors) / count)
+
+        rmse = math.sqrt(
+            sum(error ** 2 for error in errors) / count
+        )
+
         bias = sum(errors) / count
 
         if bias > 0:
@@ -182,5 +210,9 @@ def get_metrics(
 
     except HTTPException:
         raise
+
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        )
