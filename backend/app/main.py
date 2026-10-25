@@ -15,13 +15,16 @@ app = FastAPI(title="UK Wind Forecast Dashboard API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://wind-forecast-dashboard-2.onrender.com",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "https://wind-forecast-dashboard-2.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+
 
     allow_credentials=False,
     allow_methods=["*"],
