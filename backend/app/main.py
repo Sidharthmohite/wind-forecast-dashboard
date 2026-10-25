@@ -11,7 +11,7 @@ from app.elexon_service import (
 
 app = FastAPI(title="UK Wind Forecast Dashboard API")
 
-# CORS configuration for local development and Render deployment
+# CORS configuration for local development and Render deploymen 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -24,13 +24,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-
-
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
-
 
 def parse_utc(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
