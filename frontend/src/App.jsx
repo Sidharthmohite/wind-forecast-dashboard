@@ -1,399 +1,350 @@
-
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
+const API_URL =
   "https://wind-forecast-dashboard-9ha5.onrender.com";
 
+function formatDateForAPI(date) {
+  const match = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (!match) {
+    throw new Error("Enter the date in DD/MM/YYYY format.");
+  }
+
+  const [, day, month, year] = match;
+  const parsed = new Date(`${year}-${month}-${day}T00:00:00Z`);
+
+  if (
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() + 1 !== Number(month) ||
+    parsed.getUTCDate() !== Number(day)
+  ) {
+    throw new Error("Enter a valid calendar date.");
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
 function App() {
-  const [startDate, setStartDate] = useState("2026-01-01");
-  const [endDate, setEndDate] = useState("2026-01-31");
-  const [dashboard, setDashboard] = useState(null);
+  const [startDate, setStartDate] = useState("01/01/2026");
+  const [endDate, setEndDate] = useState("31/01/2026");
+
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadDashboard(event) {
-    if (event) {
-      event.preventDefault();
-    }
-
-    if (startDate > endDate) {
-      setError("The start date must be before or equal to the end date.");
-      setDashboard(null);
-      return;
-    }
-
+  async function fetchMetrics(start, end) {
     setLoading(true);
     setError("");
 
     try {
-      const url =
-        `${API_BASE_URL}/api/metrics` +
-        `?start_date=${encodeURIComponent(startDate)}` +
-        `&end_date=${encodeURIComponent(endDate)}`;
+      const startISO = formatDateForAPI(start);
+      const endISO = formatDateForAPI(end);
 
-      const response = await fetch(url);
+      if (startISO > endISO) {
+        throw new Error(
+          "Start date must be before or equal to end date."
+        );
+      }
+
+      const params = new URLSearchParams({
+        start_date: startISO,
+        end_date: endISO,
+      });
+
+      const response = await fetch(
+        `${API_URL}/api/metrics?${params.toString()}`
+      );
+
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}.`);
+        throw new Error(
+          result.detail || "Unable to fetch dashboard metrics."
+        );
       }
 
-      const data = await response.json();
-
-      if (!data || typeof data !== "object") {
-        throw new Error("The backend returned an invalid response.");
-      }
-
-      setDashboard(data);
+      setData(result);
     } catch (err) {
-      console.error("Dashboard request failed:", err);
-      setDashboard(null);
-      setError(
-        "Failed to fetch data. Please check the backend connection and try again."
-      );
+      setData(null);
+      setError(err.message || "Failed to fetch data.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadDashboard();
+    fetchMetrics("01/01/2026", "31/01/2026");
   }, []);
 
-  const metrics = dashboard?.metrics || {};
-  const comparisons = Array.isArray(dashboard?.comparisons)
-    ? dashboard.comparisons
-    : [];
+  function handleSubmit(event) {
+    event.preventDefault();
+    fetchMetrics(startDate, endDate);
+  }
+
+  const metrics = data?.metrics;
 
   const styles = {
     page: {
       minHeight: "100vh",
-      background: "#f3f6fb",
+      padding: "32px 20px",
+      background: "#f4f7fb",
       color: "#18181b",
-      fontFamily: "Arial, Helvetica, sans-serif",
-      padding: "24px 16px 36px",
-      boxSizing: "border-box",
+      fontFamily: "Arial, sans-serif",
     },
     container: {
-      maxWidth: "1000px",
+      maxWidth: "1100px",
       margin: "0 auto",
-    },
-    header: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: "12px",
-      marginBottom: "30px",
-    },
-    heading: {
-      fontSize: "clamp(27px, 5vw, 42px)",
-      margin: "0 0 6px",
-      fontWeight: 700,
-    },
-    subtitle: {
-      color: "#64748b",
-      margin: 0,
-      fontSize: "16px",
-    },
-    badge: {
-      background: "#d1fae5",
-      color: "#047857",
-      borderRadius: "30px",
-      padding: "13px 18px",
-      fontWeight: 600,
-      fontSize: "14px",
     },
     panel: {
       background: "#ffffff",
-      border: "1px solid #e5e7eb",
-      borderRadius: "16px",
+      borderRadius: "14px",
       padding: "24px",
-      marginBottom: "24px",
-    },
-    form: {
-      display: "flex",
-      flexWrap: "wrap",
-      alignItems: "end",
-      gap: "16px",
-    },
-    field: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "10px",
-      flex: "1 1 170px",
+      marginBottom: "22px",
+      boxShadow: "0 3px 14px rgba(0,0,0,0.06)",
     },
     label: {
-      fontSize: "14px",
-      fontWeight: 600,
-      color: "#475569",
+      display: "block",
+      marginBottom: "8px",
+      fontWeight: "600",
     },
     input: {
       width: "100%",
       boxSizing: "border-box",
-      padding: "14px 12px",
-      border: "1px solid #d1d5db",
-      borderRadius: "10px",
+      padding: "12px",
+      border: "1px solid #d4d4d8",
+      borderRadius: "8px",
       fontSize: "15px",
-      background: "#ffffff",
     },
     button: {
+      padding: "12px 22px",
       background: "#059669",
       color: "#ffffff",
       border: "none",
-      borderRadius: "10px",
-      padding: "14px 22px",
-      fontSize: "16px",
-      fontWeight: 700,
+      borderRadius: "8px",
+      fontSize: "15px",
+      fontWeight: "600",
       cursor: "pointer",
     },
-    error: {
-      background: "#fee2e2",
-      color: "#b91c1c",
-      border: "1px solid #fecaca",
-      padding: "16px",
-      borderRadius: "10px",
-      textAlign: "center",
-      marginBottom: "24px",
-    },
-    grid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-      gap: "16px",
-      marginBottom: "24px",
-    },
-    metricCard: {
+    card: {
       background: "#ffffff",
-      border: "1px solid #e5e7eb",
-      borderRadius: "14px",
       padding: "22px",
-    },
-    metricTitle: {
-      color: "#64748b",
-      fontSize: "14px",
-      margin: "0 0 12px",
-    },
-    metricValue: {
-      fontSize: "28px",
-      fontWeight: 700,
-      margin: 0,
-      overflowWrap: "anywhere",
-    },
-    sectionTitle: {
-      fontSize: "21px",
-      margin: "0 0 18px",
-    },
-    tableWrap: {
-      overflowX: "auto",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      fontSize: "14px",
-    },
-    cell: {
-      padding: "13px 12px",
-      textAlign: "left",
-      borderBottom: "1px solid #e5e7eb",
-      whiteSpace: "nowrap",
-    },
-    footer: {
-      textAlign: "center",
-      color: "#64748b",
-      fontSize: "13px",
-      marginTop: "40px",
+      borderRadius: "12px",
+      boxShadow: "0 3px 14px rgba(0,0,0,0.05)",
     },
   };
-
-  function formatNumber(value) {
-    const number = Number(value);
-
-    return Number.isFinite(number)
-      ? number.toLocaleString("en-GB", {
-          maximumFractionDigits: 2,
-        })
-      : "N/A";
-  }
-
-  function formatTime(value) {
-    if (!value) return "N/A";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) return String(value);
-
-    return (
-      date.toISOString().replace("T", " ").slice(0, 16) + " UTC"
-    );
-  }
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <header style={styles.header}>
-          <div>
-            <h1 style={styles.heading}>UK Wind Forecast Dashboard</h1>
-            <p style={styles.subtitle}>
-              Day-ahead forecast accuracy and actual wind generation
-            </p>
-          </div>
-
-          <span style={styles.badge}>● Wind Energy</span>
+        <header style={{ marginBottom: "28px" }}>
+          <h1>UK Wind Forecast Dashboard</h1>
+          <p>
+            Monitor wind generation forecast accuracy using
+            actual generation data.
+          </p>
         </header>
 
         <section style={styles.panel}>
-          <form style={styles.form} onSubmit={loadDashboard}>
-            <div style={styles.field}>
-              <label style={styles.label} htmlFor="start-date">
-                Start date
-              </label>
-              <input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                style={styles.input}
-                required
-              />
-            </div>
+          <h2>Date Range</h2>
 
-            <div style={styles.field}>
-              <label style={styles.label} htmlFor="end-date">
-                End date
-              </label>
-              <input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                style={styles.input}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
+          <form onSubmit={handleSubmit}>
+            <div
               style={{
-                ...styles.button,
-                opacity: loading ? 0.7 : 1,
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "18px",
+                alignItems: "end",
               }}
-              disabled={loading}
             >
-              {loading ? "Loading..." : "Load Dashboard"}
-            </button>
+              <div>
+                <label style={styles.label} htmlFor="startDate">
+                  Start Date
+                </label>
+
+                <input
+                  id="startDate"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD/MM/YYYY"
+                  value={startDate}
+                  onChange={(event) =>
+                    setStartDate(event.target.value)
+                  }
+                  style={styles.input}
+                  required
+                  pattern="(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}"
+                  title="Enter date in DD/MM/YYYY format"
+                />
+              </div>
+
+              <div>
+                <label style={styles.label} htmlFor="endDate">
+                  End Date
+                </label>
+
+                <input
+                  id="endDate"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD/MM/YYYY"
+                  value={endDate}
+                  onChange={(event) =>
+                    setEndDate(event.target.value)
+                  }
+                  style={styles.input}
+                  required
+                  pattern="(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}"
+                  title="Enter date in DD/MM/YYYY format"
+                />
+              </div>
+
+              <button
+                type="submit"
+                style={styles.button}
+                disabled={loading}
+              >
+                {loading ? "Loading..." : "Apply Filters"}
+              </button>
+            </div>
           </form>
         </section>
 
         {error && (
-          <div style={styles.error} role="alert">
-            {error}
+          <div
+            role="alert"
+            style={{
+              ...styles.panel,
+              color: "#b91c1c",
+              border: "1px solid #fecaca",
+            }}
+          >
+            <strong>Unable to load dashboard</strong>
+            <p>{error}</p>
           </div>
         )}
 
-        {loading && !dashboard && (
-          <p style={{ textAlign: "center", color: "#64748b" }}>
-            Loading wind generation data...
-          </p>
+        {loading && (
+          <p role="status">Loading wind generation metrics...</p>
         )}
 
-        {dashboard && (
+        {!loading && metrics && (
           <>
-            <section style={styles.grid}>
-              <article style={styles.metricCard}>
-                <p style={styles.metricTitle}>Matched Records</p>
-                <p style={styles.metricValue}>
-                  {formatNumber(dashboard.matched_records)}
-                </p>
-              </article>
+            <section
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "18px",
+                marginBottom: "22px",
+              }}
+            >
+              <div style={styles.card}>
+                <p>Mean Absolute Error (MAE)</p>
+                <h2>{metrics.MAE ?? "N/A"}</h2>
+              </div>
 
-              <article style={styles.metricCard}>
-                <p style={styles.metricTitle}>Mean Absolute Error (MAE)</p>
-                <p style={styles.metricValue}>
-                  {formatNumber(metrics.MAE)}
-                </p>
-              </article>
+              <div style={styles.card}>
+                <p>Root Mean Square Error (RMSE)</p>
+                <h2>{metrics.RMSE ?? "N/A"}</h2>
+              </div>
 
-              <article style={styles.metricCard}>
-                <p style={styles.metricTitle}>Root Mean Squared Error (RMSE)</p>
-                <p style={styles.metricValue}>
-                  {formatNumber(metrics.RMSE)}
-                </p>
-              </article>
-
-              <article style={styles.metricCard}>
-                <p style={styles.metricTitle}>Forecast Bias</p>
-                <p style={styles.metricValue}>
-                  {formatNumber(metrics.Bias)}
-                </p>
-              </article>
+              <div style={styles.card}>
+                <p>Forecast Bias</p>
+                <h2>{metrics.Bias ?? "N/A"}</h2>
+              </div>
             </section>
-
-            {dashboard.bias_interpretation && (
-              <section style={styles.panel}>
-                <h2 style={styles.sectionTitle}>Forecast Interpretation</h2>
-                <p>{dashboard.bias_interpretation}</p>
-              </section>
-            )}
 
             <section style={styles.panel}>
-              <h2 style={styles.sectionTitle}>Forecast vs Actual Generation</h2>
+              <h2>Forecast Accuracy Summary</h2>
 
-              {comparisons.length === 0 ? (
-                <p>
-                  No matched forecast and actual records are available
-                  for the selected dates.
-                </p>
-              ) : (
-                <div style={styles.tableWrap}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.cell}>Time (UTC)</th>
-                        <th style={styles.cell}>Forecast</th>
-                        <th style={styles.cell}>Actual</th>
-                        <th style={styles.cell}>Forecast Error</th>
-                      </tr>
-                    </thead>
+              <p>
+                <strong>Selected period:</strong>{" "}
+                {data.start_date} to {data.end_date}
+              </p>
 
-                    <tbody>
-                      {comparisons.map((item, index) => (
-                        <tr key={item.startTime || index}>
-                          <td style={styles.cell}>
-                            {formatTime(item.startTime)}
-                          </td>
-                          <td style={styles.cell}>
-                            {formatNumber(item.forecast_generation)}
-                          </td>
-                          <td style={styles.cell}>
-                            {formatNumber(item.actual_hourly_average)}
-                          </td>
-                          <td style={styles.cell}>
-                            {formatNumber(
-                              item.error_forecast_minus_actual
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <p>
+                <strong>Matched records:</strong>{" "}
+                {data.matched_records}
+              </p>
+
+              <p>
+                <strong>Data source:</strong>{" "}
+                {data.data_source}
+              </p>
+
+              <p>{data.bias_interpretation}</p>
             </section>
 
-            <p style={styles.subtitle}>
-              Data source: {dashboard.data_source || "Elexon BMRS"}
-              {" · "}
-              Period: {dashboard.start_date} to {dashboard.end_date}
-              {" · "}
-              Times shown in UTC
-            </p>
+            <section style={styles.panel}>
+              <h2>Forecast vs Actual Records</h2>
+
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    textAlign: "left",
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {[
+                        "Date & Time",
+                        "Forecast",
+                        "Actual",
+                        "Forecast Error",
+                      ].map((heading) => (
+                        <th
+                          key={heading}
+                          style={{
+                            padding: "12px",
+                            borderBottom: "2px solid #e4e4e7",
+                          }}
+                        >
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {(data.comparisons || []).map((item, index) => (
+                      <tr key={`${item.startTime}-${index}`}>
+                        <td style={{ padding: "12px" }}>
+                          {new Date(item.startTime).toLocaleString(
+                            "en-GB",
+                            {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone: "UTC",
+                            }
+                          )}
+                        </td>
+
+                        <td style={{ padding: "12px" }}>
+                          {item.forecast_generation}
+                        </td>
+
+                        <td style={{ padding: "12px" }}>
+                          {item.actual_hourly_average}
+                        </td>
+
+                        <td style={{ padding: "12px" }}>
+                          {item.error_forecast_minus_actual}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </>
         )}
-
-        <footer style={styles.footer}>
-          Data from Elexon BMRS · Times shown in UTC
-        </footer>
       </div>
     </main>
   );
