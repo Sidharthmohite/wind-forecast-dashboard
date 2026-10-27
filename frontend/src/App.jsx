@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,15 +11,15 @@ import {
 } from "recharts";
 import "./App.css";
 
-const API_URL =
-  "https://wind-forecast-dashboard-9ha5.onrender.com";
+const API_URL = "https://wind-forecast-dashboard-9ha5.onrender.com";
 
 function App() {
-  const [startDate, setStartDate] = useState("2026-01-01");
-  const [endDate, setEndDate] = useState("2026-01-31");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
 
   const fetchMetrics = async (start, end) => {
     if (!start || !end) {
@@ -36,6 +35,7 @@ function App() {
     try {
       setLoading(true);
       setError("");
+      setHasSearched(true);
 
       const url =
         `${API_URL}/api/metrics` +
@@ -52,17 +52,12 @@ function App() {
       setData(result);
     } catch (err) {
       console.error("Dashboard request failed:", err);
-      setError(
-        "Unable to load dashboard data. Please try again."
-      );
+      setData(null);
+      setError("Unable to load dashboard data. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchMetrics("2026-01-01", "2026-01-31");
-  }, []);
 
   const comparisons = Array.isArray(data?.comparisons)
     ? data.comparisons
@@ -105,7 +100,8 @@ function App() {
           <p className="eyebrow">RENEWABLE ENERGY ANALYTICS</p>
           <h1>UK Wind Forecast Dashboard</h1>
           <p className="subtitle">
-            Monitor wind generation forecast accuracy using actual generation data.
+            Monitor wind generation forecast accuracy using actual generation
+            data.
           </p>
         </div>
 
@@ -114,7 +110,7 @@ function App() {
         </span>
       </header>
 
-      {/* Date filters: no Date Range heading */}
+      {/* Date filters */}
       <section className="filter-panel">
         <form onSubmit={handleApplyFilters} className="filter-form">
           <div className="filter-field">
@@ -124,7 +120,10 @@ function App() {
               type="date"
               value={startDate}
               max={endDate || undefined}
-              onChange={(event) => setStartDate(event.target.value)}
+              onChange={(event) => {
+                setStartDate(event.target.value);
+                setError("");
+              }}
               required
             />
           </div>
@@ -136,7 +135,10 @@ function App() {
               type="date"
               value={endDate}
               min={startDate || undefined}
-              onChange={(event) => setEndDate(event.target.value)}
+              onChange={(event) => {
+                setEndDate(event.target.value);
+                setError("");
+              }}
               required
             />
           </div>
@@ -171,7 +173,7 @@ function App() {
         </article>
       </section>
 
-      {/* Forecast vs Actual line chart */}
+      {/* Forecast vs Actual chart */}
       <section className="content-panel">
         <div className="section-header">
           <div>
@@ -183,6 +185,12 @@ function App() {
         <div className="chart-container">
           {loading ? (
             <p className="empty-message">Loading chart data...</p>
+          ) : !hasSearched ? (
+            <p className="empty-message">
+              Select a date range and click Apply Filters to load chart data.
+            </p>
+          ) : error ? (
+            <p className="empty-message">Chart data is unavailable.</p>
           ) : chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>
               <LineChart
@@ -195,12 +203,15 @@ function App() {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
+
                 <XAxis
                   dataKey="time"
                   tick={{ fontSize: 11 }}
                   minTickGap={35}
                 />
+
                 <YAxis tick={{ fontSize: 12 }} width={65} />
+
                 <Tooltip />
                 <Legend />
 
@@ -225,9 +236,7 @@ function App() {
             </ResponsiveContainer>
           ) : (
             <p className="empty-message">
-              {error
-                ? "Chart data is unavailable."
-                : "No records found for the selected dates."}
+              No records found for the selected dates.
             </p>
           )}
         </div>
@@ -239,7 +248,7 @@ function App() {
           <div>
             <h2>Forecast vs Actual Records</h2>
             <p>
-              Selected period: {startDate} to {endDate}
+              Selected period: {startDate || "—"} to {endDate || "—"}
             </p>
           </div>
         </div>
@@ -256,33 +265,47 @@ function App() {
             </thead>
 
             <tbody>
-              {comparisons.map((item, index) => (
-                <tr key={`${item.startTime ?? "record"}-${index}`}>
-                  <td>
-                    {item.startTime
-                      ? new Date(item.startTime).toLocaleString("en-GB", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          timeZone: "UTC",
-                        })
-                      : "—"}
-                  </td>
-
-                  <td>{formatMetric(item.forecast_generation)}</td>
-                  <td>{formatMetric(item.actual_hourly_average)}</td>
-                  <td>
-                    {formatMetric(item.error_forecast_minus_actual)}
-                  </td>
-                </tr>
-              ))}
-
-              {!loading && comparisons.length === 0 && (
+              {!hasSearched ? (
                 <tr>
                   <td colSpan={4} className="empty-message">
-                    No records available for this date range.
+                    Select dates and click Apply Filters to view records.
+                  </td>
+                </tr>
+              ) : loading ? (
+                <tr>
+                  <td colSpan={4} className="empty-message">
+                    Loading records...
+                  </td>
+                </tr>
+              ) : comparisons.length > 0 && !error ? (
+                comparisons.map((item, index) => (
+                  <tr key={`${item.startTime ?? "record"}-${index}`}>
+                    <td>
+                      {item.startTime
+                        ? new Date(item.startTime).toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "UTC",
+                          })
+                        : "—"}
+                    </td>
+
+                    <td>{formatMetric(item.forecast_generation)}</td>
+                    <td>{formatMetric(item.actual_hourly_average)}</td>
+                    <td>
+                      {formatMetric(item.error_forecast_minus_actual)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="empty-message">
+                    {error
+                      ? "Unable to display records."
+                      : "No records available for this date range."}
                   </td>
                 </tr>
               )}
